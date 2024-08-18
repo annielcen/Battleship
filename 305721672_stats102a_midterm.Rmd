@@ -1,0 +1,737 @@
+---
+title: "Stats 102A"
+subtitle: "Midterm Project Instructions"
+date: "July 11, 2024"
+header-includes:
+   \usepackage{enumitem, graphics}
+   \usepackage{float}
+   \floatplacement{figure}{H}
+output:
+  pdf_document:
+    keep_tex: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+source("305721672_stats102a_midterm.R")
+```
+
+### (1) Create several classes of objects.
+
+\begin{itemize}
+\item[\texttt{battleship}:] Essentially, this is the game object. Everything about the current status of the game is included here.
+  \begin{itemize}
+    \item[\texttt{fleets}] This is a length-two list of the players' fleets.
+    \item[\texttt{history}] This is a tibble object with four columns:
+    \begin{itemize}
+      \item[from] A character vector of the admiral firing the shot.
+      \item[to] A character vector of the admiral who is being fired upon.
+      \item[target] A character vector of the target of the shot. e.g. "F-9", "B-6", etc.
+      \item[hit] A logical vector of whether the shot hit a ship.
+    \end{itemize}
+  \end{itemize}
+
+\item[\texttt{fleet}:] An object which represents one admiral's fleet.
+\begin{itemize}
+  \item[\texttt{admiral}] A character string representing the player in charge of the fleet.
+  \item[\texttt{ocean}] A length-two numeric vector specifying the size and shape of the ocean the fleet occupies. Be aware that the first entry in ocean specifies the number of rows and the second entry specifies the number of columns. The Hasbro 2002 rules specify that the board is 10x10 squares with the rows labeled with capital letters A-J starting with A on top, and the columns labeled 1-10 with 1 on the left. This means that \texttt{ocean = c(5, 7)} specifies an ocean with 5 rows (lettered A-E) and 7 columns (lettered 1-7), with valid target squares going from "A-1", "A-2", "A-3", ..., "E-6", "E-7".
+  \item[\texttt{ships}] A list of ship objects which are members of the fleet.
+\end{itemize}
+
+\item[\texttt{ship}:] An object representing one ship.
+  \begin{itemize}
+    \item[\texttt{name}] A character string. The name of the ship.
+    \item[\texttt{size}] An integer. The number of spaces the ship occupies.
+    \item[\texttt{position}] A length-two character vector of the bow (front) and stern (back) position of the ship, e.g., \texttt{position = c("A-1", "A-6")}. Positions are of the format "upper case letter-number" without any spaces.
+    \item[\texttt{hits}] A length(ship\$size) logical vector indicating which portions of the ship have been hit.
+    \item[\texttt{sunk}] Logical, indicating if the ship is sunk.
+  \end{itemize}
+\end{itemize}
+
+
+
+### (2) Create functions:
+
+#### Class Constructors:
+
+\begin{itemize}
+  \item[\texttt{ship()}] Creates one \texttt{ship} object
+    \begin{itemize}
+      \item[\texttt{name}] A character string, the name of the ship, e.g. "Battleship," "Submarine," etc.
+      \item[\texttt{size}] An integer, the number of spaces the ship occupies.
+    \end{itemize}
+  \item[\texttt{fleet()}] Creates one \texttt{fleet} object.
+    \begin{itemize}
+      \item[\texttt{admiral}] A character string to represent the Admiral of the fleet.
+      \item[\texttt{ocean}] \emph{Optional.} Default: \texttt{ocean = c(10, 10)} A length-two numeric vector representing the dimensions of the ocean the fleet will occupy. For the sake of this project you may assume ocean dimensions will be \emph{at least} \(5\times 5\) and \emph{at most} \(25\times 25\)
+      \item[\texttt{ships}] \emph{Optional.} Default: \texttt{ships = NULL} A variable-length list object containing one or more \texttt{ship}-class objects.
+    \end{itemize}
+    If \texttt{ships = NULL}, the result of \texttt{default\_ships()} should be used.
+  \item[\texttt{battleship()}] Creates a game object.
+    \begin{itemize}
+      \item[\texttt{fleets}] \emph{Optional.} Default: \texttt{fleets = list()}. A list of \texttt{fleet} objects in the game.
+    \end{itemize}
+    If \texttt{length(fleets) < 2} make either 1 or 2 default fleets (standard ships on a standard board). If a default \texttt{fleet} is generated the admiral should be "Player 1" or "Player 2" as appropriate.
+\end{itemize}
+
+
+```{r}
+# write class constructors here
+# make sure you include working examples and test code for each
+
+
+battleships <- ship(name = "Battleship", size = 4)
+print(battleships)
+
+
+player_fleet <- fleet(admiral = "Player 1")
+player_fleet <- position_fleet(player_fleet)
+print(player_fleet)
+summary(player_fleet)
+plot <- plot.fleet(player_fleet)
+print(plot)
+
+player_fleet2 <- fleet(admiral = "Player 1")
+player_fleet2 <- position_fleet(player_fleet2)
+print(player_fleet2)
+summary(player_fleet2)
+plot2 <- plot.fleet(player_fleet2)
+print(plot2)
+
+game <- battleship(fleets = list(player_fleet, player_fleet2))
+print(game)
+plot(game)
+summary(game)
+
+```
+
+
+#### Gameplay
+
+\begin{itemize}
+  \item[\texttt{play\_bs()}] The workhorse function for playing a single game of Battleship. This function sets up the game and calls on each of the two players to make a move over and over again until there is a winner. It has the following arguments:
+    \begin{itemize}
+      \item[\texttt{players}] Who is playing the game, this should be the names of functions which return a target string like "E-6". The default should be for a one-player game \texttt{players = c("human", "ai\_123456789")}. The first player in \texttt{players} always goes first. 
+      \item[\texttt{strengths}] The strength of the players. This is a character vector of length two, specifying the strength of the players. The default should be \texttt{strengths = c(9, 9)}. If the first player is human the first entry in strengths is unused.
+      \item[\texttt{verbose}] logical. Should a turn counter, each player's actions and whether or not a ship was hit be printed out to the console.
+      \item[\texttt{plot\_before\_turn}] Should the game be plotted before a player's turn. This a character of length 1, with default \texttt{plot = "none"} and options \texttt{"player 1", "player 2", "both"} stating whether the game should be plotted before a players turn. make sure you only plot information known to that player. This should be handed over to the \texttt{which} argument of your \texttt{plot.battleship()} function
+    \end{itemize}
+  The return value for this function is a list object. The minimal contents of this list should be \texttt{winner = } the name of the admiral who won the game. You may need to include more data in your return object to answer all of the questions in this project.
+  
+\item[\texttt{human()}] The function which polls a human player for a target. Use the \texttt{readline} function to get an input. It should accept a character string indicating a row (an appropriate letter) and a column (an appropriate number). Accepted responses should be in the form of "F-3", "J-10", etc. (\textbf{Hint:} The \texttt{substr()} or the \texttt{strsplit()} functions may be helpful for processing targets.) If a human inputs an unacceptable string like "A5", "5-5", etc. ask for another input with a warning; do not crash the entire game with an error message. Allow lower case letters as human input but convert them to uppercase letters before returning, e.g., the input "f-2" should be returned as "F-3".
+
+\item[\texttt{ai\_123456789()}] This is your bot, make sure you change its name to \texttt{ai\_yourStudentIdNumber()}. It should take \emph{either} the following three arguments:
+  \begin{itemize}
+      \item[\texttt{battleship}] The current game object. \textbf{Note:} Though your bot has access to the \emph{entire} game object which notably includes your opponent's ship placements, you are to limit your bot's access to the following items:
+      \begin{itemize}
+        \item[\texttt{history}] The object detailing the shots and hits in the game.
+        \item[\texttt{ocean}] The objects detailing the size and shape of your opponents \texttt{ocean}, so you know the bounds of the regions you need to look for ships in.
+        \item[\texttt{size}] The vector of ship sizes so you know how many ships of each size you are looking for.
+      \end{itemize}
+      Any bots which are found to access the opponent's ship placements or status (\texttt{position}, \texttt{hits}, or \texttt{sunk})  will be excluded from the tournament section and receive a \(0\) for that portion as well as a \(0\) for all portions of this project involving the AI agent you were to write. \textbf{DON'T BE A CHEATER!}
+      \item[\texttt{strength}] \emph{Optional.} Default: \texttt{strength = 9}. This should be the level of play of your bot. The default should be \texttt{strength = 9}, this is the best bot you have made at the time of your submission. You should also have a \texttt{strength = 0} bot which plays completely randomly, with no strategy, but never in the same spot twice. It \textbf{is not necessary} to have more than these two levels, but it is required to have at least these two. You may want to explore and experiment with different strength bots for a variety of reasons, but you are not required to.
+      \item[\texttt{memory}] \emph{Optional.} Default: \texttt{memory = list()}. This is an argument that allows you to store any information, computed quantities, etc. from one turn to the next. This can help make your code run a lot neater, faster, and more efficiently. This function will return a memory as well as a target location. This memory is fed back to your bot through the memory argument in it's next turn. This can help you write overarching multi-turn strategies without recomputing them in every turn.
+
+No bot shall ever fire upon the same spot twice nor shall any bot fire on a spot outside the confines of the designated ocean.
+      
+The return value of this function should be a list of length two, with the first entry being a character string named \texttt{target} representing a target square in the opponent's ocean grid like "D-6", "I-7", etc., and the second entry is a list named \texttt{memory}. This memory will be handed over to your AI in it's next turn.
+
+Make sure that this function is entirely self-contained. It cannot access any functions or objects outside of itself. It knows and can use only what is handed over to it in its three arguments.
+\end{itemize}
+\end{itemize}
+
+\emph{or} the function should take one argument:
+  \begin{itemize}
+      \item[\texttt{fleet}] \emph{Optional.} No default. If a \texttt{fleet} object is passed to your AI function it should return the same \texttt{fleet} object with updated \texttt{position} values for the \texttt{ship} objects in the fleet. That is, it places the ships.
+\end{itemize}
+
+\begin{itemize}
+\item[\texttt{default\_ships()}] Create a list object containing the five default ships (see rules), with no assigned positions.
+
+\item[\texttt{position\_fleet()}] A function to assign ships a position in the ocean.
+  \begin{itemize}
+    \item[\texttt{fleet}] A fleet object.
+    \item[\texttt{positions}] \emph{Optional.} Default: \texttt{positions = NULL}. A list of the same length as the ship list for the \texttt{fleet}. Each list item shall comprise a length two character vector indicating the start and end position of each ship in the ship list.
+  \end{itemize}
+  If no \texttt{positions} list is provided, the ships shall be randomly placed in the ocean.
+  The return value for this function should be a fleet object with updated ship positions.
+\end{itemize}
+
+
+### (3) Create methods
+For the following functions create methods for the specified classes. Unless specified, you are free to implement these however you like, but you should think carefully about what makes sense to do, that is, for example, what should printing a \texttt{ship} entail? Or a \texttt{fleet}? How would you summarize a game (a \texttt{battleship} object)?
+
+\begin{itemize}
+\item{\texttt{print()}}
+  \begin{itemize}
+    \item[\texttt{ship}] Print a meaningful representation of a \texttt{ship} object, something other than simply dumping the contents with the default printing method.
+    \item[\texttt{fleet}] Print a meaningful representation of a \texttt{fleet} object, something other than simply dumping the contents with the default printing method.
+    \item[\texttt{battleship}]Print a meaningful representation of a \texttt{battleship} object, something other than simply dumping the contents with the default printing method.
+  \end{itemize}
+
+\item{\texttt{plot()}}
+  \begin{itemize}
+    \item[\texttt{fleet}] This should produce a graphical representation of one player's game board, with their ships placed appropriately, including indications where the ship has been hit.
+    \item[\texttt{battleship}] This should produce a graphical representation of the current state of the game. It has an additional argument \texttt{which} stating whose information should be plotted. This a character of length 1, with default \texttt{which = "both"} and options \texttt{"player 1", "player 2"} stating whether only information known to that player should be plotted.
+    If \texttt{which = "both"}, both players' oceans should be drawn with each player's ships and their opponent's hits and misses. If texttt{which = "player 1"}, the ocean's of both players should be shown, and the ocean of the first player should show the ships of the first player and the hits and misses of the second player. The ocean of the second player should only show the hits and misses of the first player, but not the ships of the second player. 
+    If texttt{which = "player 2"}, follow the same logic with inverse roles.
+  \end{itemize}
+
+\item{\texttt{summary()}}
+  \begin{itemize}
+    \item[\texttt{fleet}] Summarize a \texttt{fleet} object in some meaningful way.
+    \item[\texttt{battleship}] Summarize a \texttt{battleship} object in some meaningful way.
+  \end{itemize}
+\end{itemize}
+
+
+### (4)  Simulate 1000 games for each of the following conditions:
+\begin{itemize}
+  \item \texttt{naive(strength = 0)} vs \texttt{naive(strength = 0)} 
+  \item \texttt{naive(strength = 0)} vs \texttt{smart(strength = 9)}
+  \item \texttt{smart(strength = 9)} vs \texttt{naive(strength = 0)}
+  \item \texttt{smart(strength = 9)} vs \texttt{smart(strength = 9)}
+\end{itemize}
+
+```{r}
+
+simulate_game <- function(player1_strength, player2_strength) {
+  result <- play_bs(
+    players = c("self_ai_305721672", "self_ai_305721672"),
+    strengths = c(player1_strength, player2_strength),
+    verbose = FALSE
+  )
+  return(result)
+}
+
+run_simulations <- function(num_games, player1_strength, player2_strength) {
+  player1_wins <- 0
+  player2_wins <- 0
+  turn_counts <- integer(num_games)
+  win_unsunk_counts <- integer(num_games)
+  lose_hits_counts <- integer(num_games)
+  win_pb_true_count <- 0
+  lose_pb_true_count <- 0
+  
+  for (i in seq_len(num_games)) {
+    result <- simulate_game(player1_strength, player2_strength)
+    winner <- result$win
+    turn_counts[i] <- result$turns
+    win_unsunk_counts[i] <- result$win_unsunk
+    lose_hits_counts[i] <- result$lose_hits
+    if (result$win_pb == TRUE) {
+      win_pb_true_count <- win_pb_true_count + 1
+    }
+    if (result$lose_pb == TRUE) {
+      lose_pb_true_count <- lose_pb_true_count + 1
+    }
+    
+    if (winner == "Player 1") {
+      player1_wins <- player1_wins + 1
+    } else {
+      player2_wins <- player2_wins + 1
+    }
+  }
+  
+  list(
+    player1_wins = player1_wins,
+    player2_wins = player2_wins,
+    turn_counts = turn_counts,
+    win_unsunk_counts = win_unsunk_counts, 
+    lose_hits_counts = lose_hits_counts,
+    win_pb_true_count = win_pb_true_count,
+    lose_pb_true_count = lose_pb_true_count
+  )
+}
+
+num_games <- 100
+
+# naive vs naive
+result_nn <- run_simulations(num_games, 0, 0)
+cat("Naive vs Naive:\n")
+cat("Player 1 wins:", result_nn$player1_wins, "\n")
+cat("Player 2 wins:", result_nn$player2_wins, "\n")
+
+# naive vs smart
+result_ns <- run_simulations(num_games, 0, 9)
+cat("Naive vs Smart:\n")
+cat("Player 1 wins:", result_ns$player1_wins, "\n")
+cat("Player 2 wins:", result_ns$player2_wins, "\n")
+
+# smart vs naive
+result_sn <- run_simulations(num_games, 9, 0)
+cat("Smart vs Naive:\n")
+cat("Player 1 wins:", result_sn$player1_wins, "\n")
+cat("Player 2 wins:", result_sn$player2_wins, "\n")
+
+# smart vs smart
+result_ss <- run_simulations(num_games, 9, 9)
+cat("Smart vs Smart:\n")
+cat("Player 1 wins:", result_ss$player1_wins, "\n")
+cat("Player 2 wins:", result_ss$player2_wins, "\n")
+
+# write your methods here
+# make sure you include working examples and test code for each
+```
+
+
+## Questions
+
+# I wasn't able to run the simulations past 100 times each time, I tried to chnage up my code, and I've closed all my tabs when I tried running it, but nothing seemed to work. I have tried to let each amount from 100, 200, 300,..., 1000, and even 100 takes around 10 min to knit. I've run this simulation many times to try to compensate, and I can email the other pdf files. I apologize for this. 
+
+
+### A) Showcase your game
+Show that your functions work and that you have created a working version of battleship.
+\begin{enumerate}[label=\alph*)]
+\item Create a ship called "Aircraft Carrier", a fleet with and without locations, and battleship game after 10 turns. Call your \texttt{print}, \texttt{plot}, and \texttt{summary} functions to each of them (as appropriate).
+\item include a screenshot of you playing against your AI after 10 turns.
+\end{enumerate}
+
+```{r}
+# Create a ship called "Aircraft Carrier"
+aircraft_carrier <- ship(name = "Aircraft Carrier", size = 5)
+print(aircraft_carrier)
+summary(aircraft_carrier)
+
+# Create a fleet without locations
+fleet_no_locations <- fleet(admiral = "Player 1")
+print(fleet_no_locations)
+summary(fleet_no_locations)
+
+# Position the fleet
+fleet_with_locations <- position_fleet(fleet_no_locations)
+print(fleet_with_locations)
+summary(fleet_with_locations)
+plot(fleet_with_locations)
+```
+
+
+### B) Standard Game Simulations
+Answer the following questions for each of your simulations in (4):
+\begin{enumerate}[label=\alph*)]
+\item What is the minimum number of turns the winning player needed to win the game? How does this compare to a theoretical minimum.
+\item What is the maximum number of turns the winning player needed to win the game? How does this compare to a theoretical maximum.
+\item What is the distribution of the number of unsunk ships the winning player had remaining?
+\item What is the distribution of the number of hits the losing player made?
+\item In what proportion of games has the winner lost their Patrol Boat?
+\item In what proportion of games is the losing player's last ship the Patrol Boat?
+\end{enumerate}
+
+Also answer the following questions:
+\begin{enumerate}[label=\alph*)]
+\setcounter{enumi}{6}
+\item Make a two-way relative frequency table of the proportion of times Player 1 (whoever goes fist) wins.
+\item Test the hypothesis that order of play is not a statistically significant factor in determining who wins. Use a 5\% significance level, and interpret the $p$-value.
+\item Test the hypothesis that the type of AI player is not a statistically significant factor in determining who wins. Use a 5\% significance level, and interpret the $p$-value.
+\end{enumerate}
+
+## naive(strength = 0) vs naive(strength = 0)
+
+### a)
+
+### The minimum number of turns the winning player needs to win the game is definitely more than the theoretical, but theoretically the minimum would be exactly the sum of the sizes of the all the ships. This theoretical minimum would be the case where the player never misses and only hit the ships at every turn. For example, if we were playing with the default ships it would be 2 + 3 + 3 + 4 + 5 meaning we would take a minimum of 17 turns.
+
+```{r}
+min_turns <- min(result_nn$turn_counts)
+print(min_turns)
+```
+
+### b) 
+
+### The maximum number of turns the winning player needed to win is pretty close to the theoretical max, but the theoretical maximum would be the number of squares in the ocean/gameboard, so in the case that we are playing with a 10 by 10 board then the maximum number of turns would be 100 turns.
+
+```{r}
+max_turns <- max(result_nn$turn_counts)
+print(max_turns)
+```
+
+### c)
+
+```{r}
+
+distribution_win_unsunk <- table(result_nn$win_unsunk_counts)
+barplot(distribution_win_unsunk,
+        main = "Distribution of Unsunk Ships for Winning Player",
+        xlab = "Number of Unsunk Ships",
+        ylab = "Frequency",
+        col = "plum3")
+```
+
+### d)
+
+```{r}
+distribution_lose_hits <- table(result_nn$lose_hits_counts)
+barplot(distribution_lose_hits,
+        main = "Distribution of Hits Made by Losing Player",
+        xlab = "Number of Hits",
+        ylab = "Frequency",
+        col = "seagreen1")
+```
+
+### e) 
+
+```{r}
+proportion_winner <- result_nn$win_pb_true_count / num_games
+
+cat("Proportion of games the winner lost their Patrol Boat:", proportion_winner, "\n")
+```
+
+### f)
+
+```{r}
+proportion_loser <- result_nn$lose_pb_true_count / num_games
+
+cat("Proportion of games the losing player's last ship was the Patrol Boat:", proportion_loser, "\n")
+```
+
+## naive(strength = 0) vs smart(strength = 9)
+
+### a)
+
+### The minimum number of turns the winning player needs to win the game would be _(see below)_, but theoretically the minimum would be exactly the sum of the sizes of the all the ships. This theoretical minimum would be the case where the player never misses and only hit the ships at every turn. For example, if we were playing with the default ships it would be 2 + 3 + 3 + 4 + 5 meaning we would take a minimum of 17 turns. We see that it is definitely smaller than before but still quite different from the theoretical minimum
+
+```{r}
+min_turns <- min(result_ns$turn_counts)
+print(min_turns)
+```
+
+### b) 
+
+### The maximum number of turns the winning player needed to win was _(see below)_, but the theoretical maximum would be the number of squares in the ocean/gameboard, so in the case that we are playing with a 10 by 10 board then the maximum number of turns would be 100 turns. This is better than before with just the naive but it is still quite high.
+
+```{r}
+max_turns <- max(result_ns$turn_counts)
+print(max_turns)
+```
+
+### c)
+
+```{r}
+
+distribution_win_unsunk <- table(result_ns$win_unsunk_counts)
+barplot(distribution_win_unsunk,
+        main = "Distribution of Unsunk Ships for Winning Player",
+        xlab = "Number of Unsunk Ships",
+        ylab = "Frequency",
+        col = "orchid1")
+```
+
+### d)
+
+```{r}
+distribution_lose_hits <- table(result_ns$lose_hits_counts)
+barplot(distribution_lose_hits,
+        main = "Distribution of Hits Made by Losing Player",
+        xlab = "Number of Hits",
+        ylab = "Frequency",
+        col = "lavender")
+```
+
+### e) 
+
+```{r}
+proportion_winner <- result_ns$win_pb_true_count / num_games
+
+cat("Proportion of games the winner lost their Patrol Boat:", proportion_winner, "\n")
+```
+
+### f)
+
+```{r}
+proportion_loser <- result_ns$lose_pb_true_count / num_games
+
+cat("Proportion of games the losing player's last ship was the Patrol Boat:", proportion_loser, "\n")
+```
+
+## smart(strength = 9) vs naive(strength = 0)
+
+### a)
+
+### The minimum number of turns the winning player needs to win the game would be _(see below)_, but theoretically the minimum would be exactly the sum of the sizes of the all the ships. This theoretical minimum would be the case where the player never misses and only hit the ships at every turn. For example, if we were playing with the default ships it would be 2 + 3 + 3 + 4 + 5 meaning we would take a minimum of 17 turns. Similar results as the scenario before this, but the minimum improved upon using the ai player but it is still no where close to the theoretical minimum
+
+```{r}
+min_turns <- min(result_sn$turn_counts)
+print(min_turns)
+```
+
+### b) 
+
+### The maximum number of turns the winning player needed to win was _(see below)_, but the theoretical maximum would be the number of squares in the ocean/gameboard, so in the case that we are playing with a 10 by 10 board then the maximum number of turns would be 100 turns. Using the ai player in player made the max turns a bit lower than the theoretical max
+
+```{r}
+max_turns <- max(result_sn$turn_counts)
+print(max_turns)
+```
+
+### c)
+
+```{r}
+
+distribution_win_unsunk <- table(result_sn$win_unsunk_counts)
+barplot(distribution_win_unsunk,
+        main = "Distribution of Unsunk Ships for Winning Player",
+        xlab = "Number of Unsunk Ships",
+        ylab = "Frequency",
+        col = "lightcoral")
+```
+
+### d)
+
+```{r}
+distribution_lose_hits <- table(result_sn$lose_hits_counts)
+barplot(distribution_lose_hits,
+        main = "Distribution of Hits Made by Losing Player",
+        xlab = "Number of Hits",
+        ylab = "Frequency",
+        col = "lightcyan")
+```
+
+### e) 
+
+```{r}
+proportion_winner <- result_sn$win_pb_true_count / num_games
+
+cat("Proportion of games the winner lost their Patrol Boat:", proportion_winner, "\n")
+```
+
+### f)
+
+```{r}
+proportion_loser <- result_sn$lose_pb_true_count / num_games
+
+cat("Proportion of games the losing player's last ship was the Patrol Boat:", proportion_loser, "\n")
+```
+## smart(strength = 9) vs smart(strength = 9)
+
+### a)
+
+### The minimum number of turns the winning player needs to win the game would be ___, but theoretically the minimum would be exactly the sum of the sizes of the all the ships. This theoretical minimum would be the case where the player never misses and only hit the ships at every turn. For example, if we were playing with the default ships it would be 2 + 3 + 3 + 4 + 5 meaning we would take a minimum of 17 turns. The min turns here is sitll pretty high but it is definitely lower than if we were to use a naive player
+
+```{r}
+min_turns <- min(result_ss$turn_counts)
+print(min_turns)
+```
+
+### b) 
+
+### The maximum number of turns the winning player needed to win was ___, but the theoretical maximum would be the number of squares in the ocean/gameboard, so in the case that we are playing with a 10 by 10 board then the maximum number of turns would be 100 turns. This has improved as we are a notieceable amount under the maximum turns which is good!
+
+```{r}
+max_turns <- max(result_ss$turn_counts)
+print(max_turns)
+```
+
+### c)
+
+```{r}
+
+distribution_win_unsunk <- table(result_ss$win_unsunk_counts)
+barplot(distribution_win_unsunk,
+        main = "Distribution of Unsunk Ships for Winning Player",
+        xlab = "Number of Unsunk Ships",
+        ylab = "Frequency",
+        col = "steelblue1")
+```
+
+### d)
+
+```{r}
+distribution_lose_hits <- table(result_ss$lose_hits_counts)
+barplot(distribution_lose_hits,
+        main = "Distribution of Hits Made by Losing Player",
+        xlab = "Number of Hits",
+        ylab = "Frequency",
+        col = "violetred1")
+```
+
+### e) 
+
+```{r}
+proportion_winner <- result_ss$win_pb_true_count / num_games
+
+cat("Proportion of games the winner lost their Patrol Boat:", proportion_winner, "\n")
+```
+
+### f)
+
+```{r}
+proportion_loser <- result_ss$lose_pb_true_count / num_games
+
+cat("Proportion of games the losing player's last ship was the Patrol Boat:", proportion_loser, "\n")
+```
+## g)
+
+```{r}
+win_table <- matrix(c(result_nn$player1_wins / num_games,
+                      result_ns$player1_wins / num_games,
+                      result_sn$player1_wins / num_games,
+                      result_ss$player1_wins / num_games),
+                    nrow = 2, byrow = TRUE)
+colnames(win_table) <- c("Player 2 naive", "Player 2 smart")
+rownames(win_table) <- c("Player 1 naive", "Player 1 smart")
+print(win_table)
+```
+
+## h)
+
+### Upon looking at the p-value, we can see that we fail to reject the null hypothesis as our p-value is very much greater than 0.05. This means that there is no statistically significant evidence to prove that having the first move determines the winner
+
+```{r}
+total_games <- num_games * 4
+total_player1_wins <- result_nn$player1_wins + result_ns$player1_wins + result_sn$player1_wins + result_ss$player1_wins
+
+binom_test <- binom.test(total_player1_wins, total_games, p = 0.5)
+cat("Binomial Test Results for Order of Play:\n")
+print(binom_test)
+```
+
+## i)
+
+### Upon looking at the p-value, we can see that we will reject the null hypothesis as we have statistically significant evidence to reject the null as our p-value is less than 2.2e -16 which is less than 0.05. This means that the type of AI player could be a statistically significant determing factor in who wins.
+```{r}
+naive_wins <- result_ns$player1_wins + result_sn$player2_wins
+smart_wins <- result_ns$player2_wins + result_sn$player1_wins
+
+# Perform binomial test
+total_wins <- naive_wins + smart_wins
+binom_test <- binom.test(c(naive_wins, smart_wins), p = 0.5)
+
+cat("Binomial Test Results for Type of AI Player:\n")
+print(binom_test)
+```
+
+### C) Handicapped Games
+If you wrote your functions as specified in a general enough way, it should be possible to conduct a game between two different fleets on two different oceans. Experiment with changing the setup of the game to give one player an advantage over another. Perhaps you simply give one player a \(9\times 9\) board to hide their ships in and you give the other player an \(11\times 11\) board to hide in. Or you trade one player's Patrol Boat for the other player's submarine.
+
+Try \emph{at least} \textbf{three different} handicaps in favor of the naive AI against your smart AI with the goal of making it a fair game between the two.
+
+Run 100,000 simulations and provide some summary statistics for each set of simulations. Don't worry if it's not exactly fair, even with the handicap, but it should change your results in the right direction.
+
+
+```{r}
+
+simulate_handicapped_game <- function(player1_strength, player2_strength, ocean1, ocean2, ships1, ships2) {
+  result <- play_bs(
+    players = c("self_ai_305721672", "self_ai_305721672"),
+    strengths = c(player1_strength, player2_strength),
+    verbose = FALSE,
+    oceans = list(ocean1, ocean2),
+    ships = list(ships1, ships2)
+  )
+  
+  return(result)
+}
+
+handicapped_simulations <- function(num_games, player1_strength, player2_strength, ocean1, ocean2, ships1, ships2) {
+  player1_wins <- 0
+  player2_wins <- 0
+  turn_counts <- integer(num_games)
+  
+  for (i in seq_len(num_games)) {
+    result <- simulate_handicapped_game(player1_strength, player2_strength, ocean1, ocean2, ships1, ships2)
+    winner <- result$win
+    turn_counts[i] <- result$turns
+    
+    if (winner == "Player 1") {
+      player1_wins <- player1_wins + 1
+    } else {
+      player2_wins <- player2_wins + 1
+    }
+  }
+
+  
+  list(
+    player1_wins = player1_wins,
+    player2_wins = player2_wins,
+    turn_counts = turn_counts
+  )
+  
+}
+
+summary_stats <- function(turn_counts, player1_wins, player2_wins, num_games) {
+  list(
+    min_turns = min(turn_counts),
+    max_turns = max(turn_counts),
+    mean_turns = mean(turn_counts),
+    median_turns = median(turn_counts),
+    sd_turns = sd(turn_counts),
+    proportion_player1_wins = player1_wins / num_games,
+    proportion_player2_wins = player2_wins / num_games
+  )
+}
+
+
+# Handicaps: Large ocean for naive
+ocean1_large <- c(12, 12)
+ocean2_small <- c(9, 9)
+ships1_default <- default_ships()
+ships2_default <- default_ships()
+
+# Handicaps: Patrol Boat for Submarine
+ships1_swapped <- ships1_default
+ships2_swapped <- ships2_default
+ships1_swapped[[5]] <- ship("Submarine", 3)
+ships2_swapped[[4]] <- ship("Patrol Boat", 2)
+
+# Handicaps: Small boats only for naive
+ships1_tiny <- ships1_default
+ships1_tiny[[1]] <- ship("tiny 1", 1)
+ships1_tiny[[2]] <- ship("tiny 2", 1)
+ships1_tiny[[3]] <- ship("tiny 3", 1)
+ships1_tiny[[4]] <- ship("tiny 4", 1)
+ships1_tiny[[5]] <- ship("tiny 5", 1)
+
+
+num_games <- 100
+
+result_ocean_size <- handicapped_simulations(num_games, 0, 9, ocean1_large, ocean2_small, ships1_default, ships2_default)
+result_ship_swap <- handicapped_simulations(num_games, 0, 9, c(10, 10), c(10, 10), ships1_swapped, ships2_swapped)
+result_ship_tiny <- handicapped_simulations(num_games, 0, 9, c(10, 10), c(10, 10), ships1_tiny, ships2_default)
+
+# Compute summary statistics
+ocean_size_stats <- summary_stats(result_ocean_size$turn_counts, result_ocean_size$player1_wins, result_ocean_size$player2_wins, num_games)
+
+ship_swap_stats <- summary_stats(result_ship_swap$turn_counts, result_ship_swap$player1_wins, result_ship_swap$player2_wins, num_games)
+
+ship_tiny_stats <- summary_stats(result_ship_tiny$turn_counts, result_ship_tiny$player1_wins, result_ship_tiny$player2_wins, num_games)
+
+# Print summary statistics
+
+print(ocean_size_stats)
+print(ship_swap_stats)
+print(ship_tiny_stats)
+
+```
+
+### D) Extensions
+\begin{enumerate}[label=\alph*)]
+\item Describe in as much detail as possible, what you would need to change to implement the Salvo! variant of the game. (See rules.)
+\item Identify at least two (2) ways you could modify or extend the game, other than the Salvo! variant, and describe in as much detail as possible what you would need to change to implement each of the extensions you identified. Do not implement these changes.
+\end{enumerate}
+
+## a) 
+
+### To implement the Salvo! variant of the game, I would need to first for the human character I would need to prompt the user to input a string seperated by commas like A-1,A-2,A-3,A-4,A-5 and then keep a variable that changes with the round to check how many hits I get per turn. So with the start of each round I would likely need to check how many of my ships are not sunk since the number of hits/targets I get to shoot out is dependent on this. So, let's call this value target_num. We start with the total number of ships, so for the sake of clarity lets assume a standard game with 5 ships. We start with 5 target_num, and at the beginning of each turn we will continue to update this number as we check the number of our ships that haven't been sunk. Then for the sake of human we just ask for however many targets in a desired for and do what we've done before with checking if the input is valid. Then, similar to our current code, we would check against the occupied positions to determine whether its a hit or not just since we have 5 or less values we would likely just run a loop through all the targted squares. In terms of the ai player, for now, the way that ive implemented the ai player, I've done a algorithm based on the probability density strategy, but a simple way to adjust it is to just go by tiers. When I say go by tiers, I mean like we would still have the probability grid, and we would choose the max value and then keep choosing the highest possible probability square and return those as our hits. However, another definitely more optimal strategy would likely to create a model since now that we have more than one hit we can also go towards the approach to improve accuracy with each turn since even a miss provides great information. We could likely find a way to maximize each move as misses can indicate the unlikelihood of a ship being positioned at a spot.
+
+## b)
+
+### Two ways to modify or extend the game would be the Game Pigeon variation and the High Risk variation. The Game Pigeon varitation is that when a ship is sunk, the surrounding area of ocean is also revealed. This would mean that ships cannot touch one another so all of the surrounding squares will also be revealed as empty ocean to the opponent once a ship has sunk. This modification would mean that we mainly have to add a bit ore restictions to the position assignment and make sure each ships positioning abides by these rules. This would involve instead of checking occupied positions for where the ships are located we need to check where the ships are located and the above, below, left, and right squares will now be considered as occupied as well. Next, we would have to modify the play_bs() function as well in the way that we update the ocean after each turn. To clarify, nothing changed when a ship is hit, the only thing that changes is when the whole ship is sunk. This means that after each hit we would check if the ship is sunk and if it is we would need to mark all the positions in the ship as hit and mark all the spaces around it as a miss so that the opponent knows that these squares are out of the game as well. For the High Risk variation, this would allow for players an option to sacrifice any of their ships in exchange for a more powerfull attack. The power of the said powerful attack will be determined by the ocean size and number of ships in play as well as the size of the ship sacrificed. For example, if PLayer 1 wanted to sacrifice its Patrol Boat of size 2 for a powerful attack, it would be updated in the game that the Patrol Boat is sunk, but the powerful attack would be of say size 6 so we each powerful attack 3 times the size of the boat. In terms of implementing this, I would start with modifying play_bs() as I would have to at the beginning of each round add a question to determine whether or not a player would like to decide to sacrifice a boat or play as normal. So let's say that the player chooses to sacrifice a ship. Then we would update the game object to recognize that ship as sunk but, we wouldn't update the opponents board as a miss or a hit it would still just be ocean, and then we would let the player decide where to make the attack based on the upper left corner of the area of attack (say its an attack of size 6 then it would be lie two columns of three for the area of attack). The player may decide a placement where not all of the area of attack is within the bounds of the ocean (poor decision) we will make sure that play_bs() only marks areas within the ocean to be hits or misses. Similar to how we've currently implemented play_bs(), we will also create a list of positions that were within the attack area and check it against the positions of the opponents ships to determine hits or misses. In this scenario where a player has decided to sacrifice their ships, they may not get a second turn regardless of hit or miss which we can implement by creating a logical variable that is TRUE when the player has decided to sacrifice and FALSE otherwise. Also, the player will not be notified of a hit or miss in their powerful attack which we can use the logical variable again in terms of relaying the hit or miss information to the current player.
+
+
+### E) Tournament
+Your Battleship bots will be pitted against each other in a series of random, but fair, games (random ocean size, random fleets, same for both sides). 10% of the points for the Midterm Project will be allocated to your ranking in this tournament. You will get points for having a working submission, no matter how poorly it performs. Make sure that your \texttt{ai\_123456789()} function is entirely self-contained, you will not be able to access any helper functions during the tournament. I will only read your \texttt{ai\_123456789()} from your R file, and then I will pit it against your classmates \texttt{ai\_123456789()}, so make sure it works by itself.
+
+For anonymity, please add an attribute (in your .R file) to your AI function called \texttt{alt} which is a character string containing an alternate name to report your function's results under.
+```{r}
+ai_123456789 = function(...) {
+  # your code here
+}
+attributes(ai_123456789) = list(alt = "The Professor")
+ai_123456789
+```
+
+You do not need to code anything here. I will read your function from your .R submission and run the tournament.
+
